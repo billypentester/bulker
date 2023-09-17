@@ -22,6 +22,7 @@ function App() {
   })
 
   const [error, setError] = useState(false)
+  const [conflictCoupons, setConflictCoupons] = useState([])
 
   const totalChunks = 50;
 
@@ -63,28 +64,34 @@ function App() {
 
 
   const uploadBulker = async (e) => {
-    try{
-      e.preventDefault();
-      const chunkSize = Math.ceil(user.coupon.length / totalChunks);
-      const chunks = chunkArray(user.coupon, chunkSize);
-      for (let index = 0; index < chunks.length; index++) {
-        const chunk = chunks[index];
+
+    e.preventDefault();
+    const chunkSize = Math.ceil(user.coupon.length / totalChunks);
+    const chunks = chunkArray(user.coupon, chunkSize);
+    for (let index = 0; index < chunks.length; index++) {
+      const chunk = chunks[index];
+      try{
         const res = await axios.post('http://localhost:5000/user/', {
           name: user.name,
           email: user.email,
           phone: user.phone,
           gender: user.gender,
           coupon: chunk
-        });
+        });        
         if(res.status === 201) {
           console.log(`Chunk ${index + 1} uploaded successfully`);
           setProgress( Math.round(((index + 1) / chunks.length) * 100) );
         }
       }
+      catch(err) {
+        if(err.response.status === 409) {
+          console.log(`Chunk ${index + 1} has conflict coupons`);
+          console.log(err.response.data.response.message);
+          setConflictCoupons((prev) => [...prev, ...err.response.data.response.message]);
+        }
+      }
     }
-    catch(err) {
-      alert(`Error occured due to Duplicate record or Invalid data`);
-    }
+
   }
 
   return (
@@ -140,6 +147,20 @@ function App() {
             </div>
           </Form>
         </section>
+        {
+          conflictCoupons.length > 0 && (
+            <section className='my-5'>
+              <h3 className='text-center'>Conflict Coupons</h3>
+              <ul>
+                {
+                  conflictCoupons.map((coupon, index) => (
+                    <li key={index}>{coupon.coupon}</li>
+                  ))
+                }
+              </ul>
+            </section>
+          )
+        }
       </div>
     </>
   )

@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as csvParser from 'csv-parser';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 
 import { User } from './entities/user.entity';
 
@@ -37,31 +37,27 @@ export class UserService {
     });
   }
 
-  async uploadFile(file, body)
+  async uploadBulk(body)
   {
-    const transform = body.coupon.map((coupon) => {
-      return {
-        name: body.name,
-        email: body.email,
-        phone: body.phone,
-        gender: body.gender,
-        coupon: coupon,
+    try{
+      const existingCoupons =  await this.userRepository.find({ where: { coupon: In(body.coupon) } });
+      if(existingCoupons.length > 0){
+        throw new ConflictException(existingCoupons);
       }
-    })
-    const data = await this.userRepository.save(transform)
-    if(data)
-    {
-      return {
-        status: 200,
-        message: 'Data has been saved'
-      }
+      // const transform = body.coupon.map((coupon: Object) => {
+      //   return {
+      //     name: body.name,
+      //     email: body.email,
+      //     phone: body.phone,
+      //     gender: body.gender,
+      //     coupon: coupon,
+      //   }
+      // })
+      // const data = await this.userRepository.save(transform);
+      // return data;
     }
-    else
-    {
-      return {
-        status: 400,
-        message: 'Unsupported File Format or Duplicate Data'
-      }
+    catch(error){
+      throw new ConflictException(error);
     }
   }
   
