@@ -2,29 +2,25 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useState } from 'react'
 
 import Nav from './components/Nav'
-import Button from 'react-bootstrap/Button';
-import Row from 'react-bootstrap/Row';
+import Alert from './components/Alert';
+
 import Form from 'react-bootstrap/Form';
+import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
+import Button from 'react-bootstrap/Button';
 import ProgressBar from 'react-bootstrap/ProgressBar';
-import Alert from 'react-bootstrap/Alert';
+import Table from 'react-bootstrap/Table';
 
 import axios from 'axios';
 
 function App() {
 
-  const [user, setUser] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    gender: 'Male',
-    coupon: []
-  })
-
-  const [error, setError] = useState(false)
-  const [conflictCoupons, setConflictCoupons] = useState([])
-
+  const [user, setUser] = useState({name: '', email: '', phone: '', gender: 'Male', coupon: []})
   const totalChunks = 50;
+
+  const [status, setStatus] = useState({ type: '', message: ''})
+  const [disabled, setDisabled] = useState(false)
+  const [conflictCoupons, setConflictCoupons] = useState([])
 
   const [progress, setProgress] = useState(0);
 
@@ -53,19 +49,17 @@ function App() {
     const chunks = [];
     const length = arr.length;
     let i = 0;
-  
     while (i < length) {
       chunks.push(arr.slice(i, i + chunkSize));
       i += chunkSize;
     }
-  
     return chunks;
   }
 
 
   const uploadBulker = async (e) => {
-
     e.preventDefault();
+    setDisabled(true);
     const chunkSize = Math.ceil(user.coupon.length / totalChunks);
     const chunks = chunkArray(user.coupon, chunkSize);
     for (let index = 0; index < chunks.length; index++) {
@@ -81,13 +75,19 @@ function App() {
         if(res.status === 201) {
           console.log(`Chunk ${index + 1} uploaded successfully`);
           setProgress( Math.round(((index + 1) / chunks.length) * 100) );
+          if(index === chunks.length - 1) {
+            setStatus({ type: 'info', message: 'Bulk upload successful' });
+            setDisabled(false);
+          }
         }
       }
       catch(err) {
         if(err.response.status === 409) {
           console.log(`Chunk ${index + 1} has conflict coupons`);
-          console.log(err.response.data.response.message);
           setConflictCoupons((prev) => [...prev, ...err.response.data.response.message]);
+          setStatus({ type: 'danger', message: 'Bulk upload failed' });
+          setDisabled(false);
+          break;
         }
       }
     }
@@ -101,8 +101,8 @@ function App() {
         <h1 className='text-center'>Bulk Upload</h1>
         <p className='text-center'>Upload a CSV file to bulk upload your data</p>
         {
-          error && (
-            <Alert variant='danger'> Duplicate coupons are present in uploaded file </Alert>
+          status.message && (
+            <Alert type={status.type} status={status.message} />
           )
         }
         <section className='my-5'>
@@ -110,21 +110,21 @@ function App() {
             <Row className="mb-3">
                 <Form.Group as={Col} controlId="formBasicName">
                     <Form.Label>Name</Form.Label>
-                    <Form.Control type="name" placeholder="Enter Name" name="name" value={user.name} onChange={e => setUser({ ...user, name: e.target.value })} />
+                    <Form.Control type="name" placeholder="Enter Name" name="name" value={user.name} onChange={e => setUser({ ...user, name: e.target.value })} disabled={disabled} />
                 </Form.Group>
                 <Form.Group as={Col} controlId="formBasicEmail">
                     <Form.Label>Email</Form.Label>
-                    <Form.Control type="email" placeholder="Enter Email" name="email" value={user.email} onChange={e => setUser({ ...user, email: e.target.value })} />
+                    <Form.Control type="email" placeholder="Enter Email" name="email" value={user.email} onChange={e => setUser({ ...user, email: e.target.value })} disabled={disabled} />
                 </Form.Group>
             </Row>
             <Row className="mb-3">
                 <Form.Group as={Col} className="mb-3" controlId="formBasicNumber">
                     <Form.Label>Number</Form.Label>
-                    <Form.Control type="number" placeholder="Enter Phone Number" name="phone" value={user.phone} onChange={e => setUser({ ...user, phone: e.target.value })} />
+                    <Form.Control type="number" placeholder="Enter Phone Number" name="phone" value={user.phone} onChange={e => setUser({ ...user, phone: e.target.value })} disabled={disabled} />
                 </Form.Group>
                 <Form.Group as={Col} className="mb-3" controlId="formBasicGender">
                     <Form.Label>Gender</Form.Label>
-                        <Form.Select value={user.gender} onChange={e => setUser({  ...user, gender: e.target.value })}>
+                        <Form.Select value={user.gender} onChange={e => setUser({  ...user, gender: e.target.value })} disabled={disabled}>
                         <option>Select</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
@@ -143,21 +143,40 @@ function App() {
               )
             }
             <div className="my-3">
-                <Button variant="dark" type="submit" style={{width: '100%'}} onClick={uploadBulker}> Submit </Button>
+                <Button variant="dark" type="submit" style={{width: '100%'}} onClick={uploadBulker} disabled={disabled}> Submit </Button>
             </div>
           </Form>
         </section>
         {
           conflictCoupons.length > 0 && (
             <section className='my-5'>
-              <h3 className='text-center'>Conflict Coupons</h3>
-              <ul>
-                {
-                  conflictCoupons.map((coupon, index) => (
-                    <li key={index}>{coupon.coupon}</li>
-                  ))
-                }
-              </ul>
+              <h3 className='text-center my-4'>Conflict Coupons</h3>
+              <Table bordered hover>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Gender</th>
+                        <th>Coupon</th>
+                    </tr>
+                </thead>
+                <tbody>
+                  {
+                    conflictCoupons.map((coupon, index) => (
+                      <tr key={index}>
+                        <td>{user.id}</td>
+                        <td>{user.name}</td>
+                        <td>{user.email}</td>
+                        <td>{user.phone}</td>
+                        <td>{user.gender}</td>
+                        <td>{coupon.coupon}</td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </Table>
             </section>
           )
         }

@@ -40,21 +40,24 @@ export class UserService {
   async uploadBulk(body)
   {
     try{
-      const existingCoupons =  await this.userRepository.find({ where: { coupon: In(body.coupon) } });
+      const existingCoupons =  await this.userRepository.find({ where: { coupon: In(body.coupon) }, order: { coupon: 'ASC' } });
       if(existingCoupons.length > 0){
         throw new ConflictException(existingCoupons);
       }
-      // const transform = body.coupon.map((coupon: Object) => {
-      //   return {
-      //     name: body.name,
-      //     email: body.email,
-      //     phone: body.phone,
-      //     gender: body.gender,
-      //     coupon: coupon,
-      //   }
-      // })
-      // const data = await this.userRepository.save(transform);
-      // return data;
+      else
+      {
+        const transform = body.coupon.map((coupon: Object) => {
+          return {
+            name: body.name,
+            email: body.email,
+            phone: body.phone,
+            gender: body.gender,
+            coupon: coupon,
+          }
+        })
+        const data = await this.userRepository.save(transform);
+        return data;
+      }
     }
     catch(error){
       throw new ConflictException(error);
