@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import Nav from './components/Nav'
 import Alert from './components/Alert';
+import ExportButton from './components/ExportButton';
 
 import Form from 'react-bootstrap/Form';
 import Row from 'react-bootstrap/Row';
@@ -24,25 +25,36 @@ function App() {
 
   const [progress, setProgress] = useState(0);
 
+  const processFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setConflictCoupons([])
+      const text = event.target.result;
+      const rows = text.split('\r\n');
+      const data = rows.map((row) => row.split(','));
+  
+      if (data[0].length !== 1) {
+        setStatus({ type: 'danger', message: 'Invalid file format' });
+      } 
+      else {
+        const transform = data.slice(1).map((row) => row[0]);
+        const hasDuplicates = new Set(transform).size !== transform.length;
+        if (hasDuplicates) {
+          setStatus({ type: 'danger', message: 'Duplicate records found' });
+        } 
+        else {
+          setUser((prev) => ({ ...prev, coupon: transform }));
+          setStatus({ type: '', message: '' });
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target.result;
-        const rows = text.split('\r\n');
-        const data = rows.map(row => row.split(','));
-        const transform = data.slice(1).map(row => row[0]);
-        if(transform.length !== new Set(transform).size) {
-          setError(true);
-        }
-        else
-        {
-          setUser((prev) => ({ ...prev, coupon: transform }));  
-        }
-      };
-      reader.readAsText(file);
-    }
+    setStatus({ type: '', message: '' });
+    processFile(file);
   };
 
   function chunkArray(arr, chunkSize) {
@@ -58,7 +70,6 @@ function App() {
 
 
   const uploadBulker = async (e) => {
-    e.preventDefault();
     setDisabled(true);
     const chunkSize = Math.ceil(user.coupon.length / totalChunks);
     const chunks = chunkArray(user.coupon, chunkSize);
@@ -78,6 +89,7 @@ function App() {
           if(index === chunks.length - 1) {
             setStatus({ type: 'info', message: 'Bulk upload successful' });
             setDisabled(false);
+            setUser({name: '', email: '', phone: '', gender: 'Male', coupon: []});
           }
         }
       }
@@ -85,14 +97,39 @@ function App() {
         if(err.response.status === 409) {
           console.log(`Chunk ${index + 1} has conflict coupons`);
           setConflictCoupons((prev) => [...prev, ...err.response.data.response.message]);
-          setStatus({ type: 'danger', message: 'Bulk upload failed' });
+          setStatus({ type: 'danger', message: 'There are some duplicate records in file' });
+          setProgress( Math.round(((index + 1) / chunks.length) * 100) );
           setDisabled(false);
-          break;
+          setUser({name: '', email: '', phone: '', gender: 'Male', coupon: []});
         }
       }
     }
-
   }
+
+  const validateForm = () => {
+    for (const key in user) {
+      if(user[key] === '') {
+        setStatus({ type: 'danger', message: 'Please fill all the fields' });
+        return;
+      }
+    }
+    if(user.coupon.length === 0) {
+      setStatus({ type: 'danger', message: 'Please upload a file' });
+      return;
+    }
+    else {
+      uploadBulker();
+    }
+  }
+
+  const submitHandler = (e) => {
+    e.preventDefault();
+    validateForm();
+    // if(status.message === '') {
+    //   uploadBulker();
+    // }
+  }
+
 
   return (
     <>
@@ -143,7 +180,7 @@ function App() {
               )
             }
             <div className="my-3">
-                <Button variant="dark" type="submit" style={{width: '100%'}} onClick={uploadBulker} disabled={disabled}> Submit </Button>
+                <Button variant="dark" type="submit" style={{width: '100%'}} onClick={submitHandler} disabled={disabled}> Submit </Button>
             </div>
           </Form>
         </section>
@@ -164,19 +201,24 @@ function App() {
                 </thead>
                 <tbody>
                   {
-                    conflictCoupons.map((coupon, index) => (
+                    conflictCoupons
+                    .filter((c) => c.coupon !== '')
+                    .map((c, index) => (
                       <tr key={index}>
-                        <td>{user.id}</td>
-                        <td>{user.name}</td>
-                        <td>{user.email}</td>
-                        <td>{user.phone}</td>
-                        <td>{user.gender}</td>
-                        <td>{coupon.coupon}</td>
+                        <td>{c.id}</td>
+                        <td>{c.name}</td>
+                        <td>{c.email}</td>
+                        <td>{c.phone}</td>
+                        <td>{c.gender}</td>
+                        <td>{c.coupon}</td>
                       </tr>
                     ))
                   }
                 </tbody>
               </Table>
+              <div className='text-end my-4'>
+                <ExportButton data={conflictCoupons} />
+              </div>
             </section>
           )
         }

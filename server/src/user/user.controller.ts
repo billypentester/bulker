@@ -10,5 +10,5 @@ export class UserController {
   uploadBulk(@Body() body : any) {
     return this.userService.uploadBulk(body);
   }
-  
+
 }
